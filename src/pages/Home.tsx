@@ -61,12 +61,12 @@ export function Home() {
   }, [canvasRef]);
 
   return (
-    <div className="">
-      <div className="flex flex-col lg:flex-row  items-center justify-between ">
-        <Game />
-        {/* <Quotes /> */}
-      </div>
-      {/* <FoundIssue /> */}
-    </div>
+    <Game />
+    // <div className="">
+    //   <div className="flex flex-col lg:flex-row  items-center justify-between ">
+    //     <Quotes />
+    //   </div>
+    //   <FoundIssue />
+    // </div>
   );
 }
