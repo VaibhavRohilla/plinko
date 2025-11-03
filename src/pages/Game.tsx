@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState, memo } from "react";
 import { BallManager } from "../game/classes/BallManager";
+import { outcomesByRows } from "../game/outcomesByRows";
+import { WIDTH } from "../game/constants";
+import { pad } from "../game/padding";
 
 // Type definitions
 type GameMode = "manual" | "auto";
@@ -20,6 +23,8 @@ type SidebarProps = {
   mode: GameMode;
   setMode: (mode: GameMode) => void;
   placeBet: () => void;
+  rows: number;
+  setRows: (r: number) => void;
 };
 
 type FooterProps = {
@@ -53,7 +58,7 @@ const Header = memo(({ balance, currency }: HeaderProps) => (
 ));
 
 // Memoized Sidebar component
-const ManualControls = memo(() => {
+const ManualControls = memo(({ rows, setRows }: { rows: number; setRows: (r: number) => void }) => {
   const totalBalance = 115; // example - replace with your real balance
   const maxBetLimit = 20;
 
@@ -106,29 +111,13 @@ const ManualControls = memo(() => {
     setError("");
   };
 
-  const [ballCount, setBallCount] = useState<number>(8);
-
-  const handleChangeBallAmount = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChangeRows = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     const numericValue = parseInt(value, 10);
-
-    // Allow empty temporarily
-    if (value === "") {
-      setBallCount(8);
-      return;
-    }
-
-    if (isNaN(numericValue)) {
-      return;
-    }
-
-    if (numericValue < 8) {
-      setBallCount(8);
-    } else if (numericValue > 16) {
-      setBallCount(16);
-    } else {
-      setBallCount(numericValue);
-    }
+    if (value === "") return;
+    if (isNaN(numericValue)) return;
+    const clamped = Math.max(8, Math.min(30, numericValue));
+    setRows(clamped);
   };
 
   return (
@@ -186,19 +175,19 @@ const ManualControls = memo(() => {
         </select>
       </div>
       <div>
-        <label htmlFor="ballCount" className="block text-gray-400 mb-2 text-sm">
-          Number of Balls
+        <label htmlFor="rows" className="block text-gray-400 mb-2 text-sm">
+          Number of Rows
         </label>
 
         <input
-          id="ballCount"
+          id="rows"
           type="number"
           className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-          placeholder="1"
-          min="1"
-          max="16"
-          value={ballCount}
-          onChange={handleChangeBallAmount}
+          placeholder="18"
+          min="8"
+          max="30"
+          value={rows}
+          onChange={handleChangeRows}
         />
       </div>
     </div>
@@ -260,7 +249,7 @@ const AutoControls = memo(() => {
   );
 });
 
-const Sidebar = memo(({ mode, setMode, placeBet }: SidebarProps) => (
+const Sidebar = memo(({ mode, setMode, placeBet, rows, setRows }: SidebarProps) => (
   <aside className="w-full lg:w-80 bg-gray-900/60 backdrop-blur-md border-r border-gray-800 p-4">
     <div className="flex mb-6">
       <button
@@ -286,7 +275,7 @@ const Sidebar = memo(({ mode, setMode, placeBet }: SidebarProps) => (
         Auto
       </button>
     </div>
-    <ManualControls />
+    <ManualControls rows={rows} setRows={setRows} />
     {mode === "auto" ? <AutoControls /> : ""}
     <button
       type="button"
@@ -327,16 +316,24 @@ export function Game() {
   const [ballManager, setBallManager] = useState<BallManager>();
   const [mode, setMode] = useState<GameMode>("manual");
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [rows, setRows] = useState<number>(18);
 
   useEffect(() => {
     if (canvasRef.current) {
-      const ballManager = new BallManager(canvasRef.current);
+      const ballManager = new BallManager(canvasRef.current, undefined, { rows });
       setBallManager(ballManager);
     }
   }, [canvasRef]);
 
+  useEffect(() => {
+    ballManager?.setConfig({ rows });
+  }, [rows, ballManager]);
+
   const placeBet = () => {
-    ballManager?.addBall(3972887.657476276);
+    const slotOffset = outcomesByRows[18][12][0]; // choose any entry
+    const sinkW = ballManager?.getSinkWidth() ?? 36;
+    const startX = pad(WIDTH / 2 + sinkW * slotOffset);
+    ballManager?.addBall(startX);
   };
 
   return (
@@ -344,7 +341,7 @@ export function Game() {
       <Header balance={MOCK_USER.balance} currency={MOCK_USER.currency} />
 
       <div className="flex-1 flex flex-col lg:flex-row">
-        <Sidebar mode={mode} setMode={setMode} placeBet={placeBet} />
+        <Sidebar mode={mode} setMode={setMode} placeBet={placeBet} rows={rows} setRows={setRows} />
 
         <main className="flex-1 p-4 flex flex-col items-center justify-center">
           <div className="relative w-full max-w-3xl aspect-square">

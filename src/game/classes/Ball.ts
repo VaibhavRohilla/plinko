@@ -56,6 +56,8 @@ export class Ball {
           const overlap = this.radius + obstacle.radius - unpad(dist);
           this.x += pad(Math.cos(angle) * overlap);
           this.y += pad(Math.sin(angle) * overlap);
+          // trigger glow on collider
+          obstacle.glow = 1;
         }
       });
   

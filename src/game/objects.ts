@@ -1,16 +1,11 @@
-import {
-  HEIGHT,
-  NUM_SINKS,
-  WIDTH,
-  obstacleRadius,
-  sinkWidth,
-} from "./constants";
+import { HEIGHT, WIDTH } from "./constants";
 import { pad } from "./padding";
 
 export interface Obstacle {
   x: number;
   y: number;
   radius: number;
+  glow?: number;
 }
 
 export interface Sink {
@@ -21,53 +16,46 @@ export interface Sink {
   multiplier?: number;
 }
 
-const MULTIPLIERS: { [key: number]: number } = {
-  1: 16,
-  2: 9,
-  3: 2,
-  4: 1.4,
-  5: 1.4,
-  6: 1.2,
-  7: 1.1,
-  8: 1,
-  9: 0.5,
-  10: 1,
-  11: 1.1,
-  12: 1.2,
-  13: 1.4,
-  14: 1.4,
-  15: 2,
-  16: 9,
-  17: 16,
-};
+function getMultiplier(indexZeroBased: number, numSinks: number): number {
+  const i = indexZeroBased;
+  const center = (numSinks - 1) / 2;
+  const d = Math.abs(i - center);
+  const maxD = center;
+  const edge = 16;
+  const mid = 1;
+  const centerMin = 0.5; // minimum at center
+  // Interpolate from centerMin at center to edge at edges, with a slight bump around mid
+  const linear = centerMin + (edge - centerMin) * (d / Math.max(1, maxD));
+  // Slight mid bump
+  const midBump = mid + (1 - Math.abs(d - maxD / 2) / (maxD / 2 + 0.0001)) * 0.2;
+  return Number((linear * midBump).toFixed(2));
+}
 
-export const createObstacles = (): Obstacle[] => {
+export function createObstacles(rows: number, obstacleRadiusPx: number): Obstacle[] {
   const obstacles: Obstacle[] = [];
-  const rows = 18;
+  const verticalGap = (HEIGHT - 220) / rows; // keep bottom space for sinks
+  const baseSpacing = WIDTH / (rows + 2); // horizontal spacing adapts to rows
   for (let row = 2; row < rows; row++) {
     const numObstacles = row + 1;
-    const y = 0 + row * 35;
-    const spacing = 36;
+    const y = row * verticalGap;
+    const spacing = baseSpacing;
     for (let col = 0; col < numObstacles; col++) {
       const x = WIDTH / 2 - spacing * (row / 2 - col);
-      obstacles.push({ x: pad(x), y: pad(y), radius: obstacleRadius });
+      obstacles.push({ x: pad(x), y: pad(y), radius: obstacleRadiusPx });
     }
   }
   return obstacles;
-};
+}
 
-export const createSinks = (): Sink[] => {
-  const sinks = [];
-  const SPACING = obstacleRadius * 2;
-
-  for (let i = 0; i < NUM_SINKS; i++) {
-    const x =
-      WIDTH / 2 + sinkWidth * (i - Math.floor(NUM_SINKS / 2)) - SPACING * 1.5;
+export function createSinks(numSinks: number, sinkWidthPx: number, obstacleRadiusPx: number): Sink[] {
+  const sinks: Sink[] = [];
+  const spacingPad = obstacleRadiusPx * 2;
+  for (let i = 0; i < numSinks; i++) {
+    const x = WIDTH / 2 + sinkWidthPx * (i - Math.floor(numSinks / 2)) - spacingPad * 1.5;
     const y = HEIGHT - 170;
-    const width = sinkWidth;
+    const width = sinkWidthPx;
     const height = width;
-    sinks.push({ x, y, width, height, multiplier: MULTIPLIERS[i + 1] });
+    sinks.push({ x, y, width, height, multiplier: getMultiplier(i, numSinks) });
   }
-
   return sinks;
-};
+}
