@@ -7,7 +7,7 @@ type Outputs = { [binIndex: number]: number[] };
 
 export function Calibrate() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [rows, setRows] = useState<number>(18);
+  const [rows, setRows] = useState<number>(16);
   const [slotsHalfRange, setSlotsHalfRange] = useState<number>(10);
   const [drops, setDrops] = useState<number>(500);
   const [outputs, setOutputs] = useState<Outputs>({});
@@ -80,8 +80,8 @@ export function Calibrate() {
             className="bg-gray-800 border border-gray-700 rounded px-3 py-1 text-white"
             value={rows}
             min={8}
-            max={30}
-            onChange={(e) => setRows(Math.min(30, Math.max(8, parseInt(e.target.value || "18", 10))))}
+            max={16}
+            onChange={(e) => setRows(Math.min(16, Math.max(8, parseInt(e.target.value || "18", 10))))}
           />
         </div>
         <div className="flex items-center gap-2">

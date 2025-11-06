@@ -71,6 +71,9 @@ export class Ball {
         ) {
             this.vx = 0;
             this.vy = 0;
+            // trigger bin feedback
+            sink.press = 1;
+            sink.glow = 1;
             this.onFinish(i);
             break;
         }

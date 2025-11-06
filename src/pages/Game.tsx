@@ -116,7 +116,7 @@ const ManualControls = memo(({ rows, setRows }: { rows: number; setRows: (r: num
     const numericValue = parseInt(value, 10);
     if (value === "") return;
     if (isNaN(numericValue)) return;
-    const clamped = Math.max(8, Math.min(30, numericValue));
+    const clamped = Math.max(8, Math.min(16, numericValue));
     setRows(clamped);
   };
 
@@ -183,9 +183,9 @@ const ManualControls = memo(({ rows, setRows }: { rows: number; setRows: (r: num
           id="rows"
           type="number"
           className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-          placeholder="18"
+          placeholder="16"
           min="8"
-          max="30"
+          max="16"
           value={rows}
           onChange={handleChangeRows}
         />
@@ -316,7 +316,7 @@ export function Game() {
   const [ballManager, setBallManager] = useState<BallManager>();
   const [mode, setMode] = useState<GameMode>("manual");
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [rows, setRows] = useState<number>(18);
+  const [rows, setRows] = useState<number>(16);
 
   useEffect(() => {
     if (canvasRef.current) {
@@ -330,7 +330,7 @@ export function Game() {
   }, [rows, ballManager]);
 
   const placeBet = () => {
-    const slotOffset = outcomesByRows[18][12][0]; // choose any entry
+    const slotOffset = outcomesByRows[16][1][0]; // choose any entry
     const sinkW = ballManager?.getSinkWidth() ?? 36;
     const startX = pad(WIDTH / 2 + sinkW * slotOffset);
     ballManager?.addBall(startX);
