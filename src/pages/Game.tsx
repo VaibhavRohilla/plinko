@@ -25,6 +25,8 @@ type SidebarProps = {
   placeBet: () => void;
   rows: number;
   setRows: (r: number) => void;
+  risk: 'low' | 'medium' | 'high';
+  setRisk: (r: 'low' | 'medium' | 'high') => void;
 };
 
 type FooterProps = {
@@ -58,7 +60,7 @@ const Header = memo(({ balance, currency }: HeaderProps) => (
 ));
 
 // Memoized Sidebar component
-const ManualControls = memo(({ rows, setRows }: { rows: number; setRows: (r: number) => void }) => {
+const ManualControls = memo(({ rows, setRows, risk, setRisk }: { rows: number; setRows: (r: number) => void; risk: 'low' | 'medium' | 'high'; setRisk: (r: 'low' | 'medium' | 'high') => void }) => {
   const totalBalance = 115; // example - replace with your real balance
   const maxBetLimit = 20;
 
@@ -168,6 +170,8 @@ const ManualControls = memo(({ rows, setRows }: { rows: number; setRows: (r: num
         <select
           id="riskLevel"
           className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+          value={risk}
+          onChange={(e) => setRisk(e.target.value as 'low' | 'medium' | 'high')}
         >
           <option value="low">Low</option>
           <option value="medium">Medium</option>
@@ -249,7 +253,7 @@ const AutoControls = memo(() => {
   );
 });
 
-const Sidebar = memo(({ mode, setMode, placeBet, rows, setRows }: SidebarProps) => (
+const Sidebar = memo(({ mode, setMode, placeBet, rows, setRows, risk, setRisk }: SidebarProps) => (
   <aside className="w-full lg:w-80 bg-gray-900/60 backdrop-blur-md border-r border-gray-800 p-4">
     <div className="flex mb-6">
       <button
@@ -275,7 +279,7 @@ const Sidebar = memo(({ mode, setMode, placeBet, rows, setRows }: SidebarProps) 
         Auto
       </button>
     </div>
-    <ManualControls rows={rows} setRows={setRows} />
+    <ManualControls rows={rows} setRows={setRows} risk={risk} setRisk={setRisk} />
     {mode === "auto" ? <AutoControls /> : ""}
     <button
       type="button"
@@ -317,17 +321,18 @@ export function Game() {
   const [mode, setMode] = useState<GameMode>("manual");
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [rows, setRows] = useState<number>(16);
+  const [risk, setRisk] = useState<'low' | 'medium' | 'high'>('low');
 
   useEffect(() => {
     if (canvasRef.current) {
-      const ballManager = new BallManager(canvasRef.current, undefined, { rows });
+      const ballManager = new BallManager(canvasRef.current, undefined, { rows, risk });
       setBallManager(ballManager);
     }
   }, [canvasRef]);
 
   useEffect(() => {
-    ballManager?.setConfig({ rows });
-  }, [rows, ballManager]);
+    ballManager?.setConfig({ rows, risk });
+  }, [rows, risk, ballManager]);
 
   const placeBet = () => {
     const slotOffset = outcomesByRows[16][1][0]; // choose any entry
@@ -341,7 +346,7 @@ export function Game() {
       <Header balance={MOCK_USER.balance} currency={MOCK_USER.currency} />
 
       <div className="flex-1 flex flex-col lg:flex-row">
-        <Sidebar mode={mode} setMode={setMode} placeBet={placeBet} rows={rows} setRows={setRows} />
+        <Sidebar mode={mode} setMode={setMode} placeBet={placeBet} rows={rows} setRows={setRows} risk={risk} setRisk={setRisk} />
 
         <main className="flex-1 p-4 flex flex-col items-center justify-center">
           <div className="relative w-full max-w-3xl aspect-square">

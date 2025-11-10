@@ -2,6 +2,7 @@ import { HEIGHT, WIDTH } from "../constants";
 import { createObstacles, createSinks, type Obstacle, type Sink } from "../objects";
 import { pad, unpad } from "../padding";
 import { Ball } from "./Ball";
+import { getMultipliersFor, type RiskLevel } from "../multipliers";
 
 export type BallManagerConfig = {
     rows: number;
@@ -9,6 +10,7 @@ export type BallManagerConfig = {
     glowIntensity?: number; // 0..2 scaling for glow size/alpha
     glowColor?: string; // CSS rgb tuple string used in rgba(), e.g. "255,255,0"
     sinkGapPx?: number; // vertical gap between lowest collider and top of bins
+    risk?: RiskLevel;
 };
 
 export class BallManager {
@@ -28,6 +30,7 @@ export class BallManager {
     private glowIntensity: number;
     private glowColor: string;
     private sinkGapPx: number;
+    private risk: RiskLevel;
 
     constructor(canvasRef: HTMLCanvasElement, onFinish?: (index: number,startX?: number) => void, config?: Partial<BallManagerConfig>) {
         this.balls = [];
@@ -39,6 +42,8 @@ export class BallManager {
         this.sinkWidthPx = this.computeSinkWidth(this.rows);
         this.obstacles = createObstacles(this.rows, this.obstacleRadiusPx);
         this.sinks = createSinks(this.getNumSinks(), this.sinkWidthPx);
+        this.risk = config?.risk ?? 'low';
+        this.applySinksMultipliers();
         // glow defaults and overrides
         this.glowFill = config?.glowFill ?? true;
         const intensity = config?.glowIntensity ?? 1;
@@ -82,6 +87,11 @@ export class BallManager {
     }
 
     setConfig(config: Partial<BallManagerConfig>) {
+        // Update risk first (affects multipliers)
+        if (config.risk) {
+            this.risk = config.risk;
+            this.applySinksMultipliers();
+        }
         // Update visual glow settings regardless of row changes
         if (typeof config.glowFill === 'boolean') this.glowFill = config.glowFill;
         if (typeof config.glowIntensity === 'number') this.glowIntensity = Math.max(0, Math.min(2, config.glowIntensity));
@@ -95,6 +105,7 @@ export class BallManager {
             this.sinkWidthPx = this.computeSinkWidth(this.rows);
             this.obstacles = createObstacles(this.rows, this.obstacleRadiusPx);
             this.sinks = createSinks(this.getNumSinks(), this.sinkWidthPx);
+            this.applySinksMultipliers();
             this.positionSinksBelowObstacles();
             // clear balls when reconfiguring
             this.balls = [];
@@ -102,7 +113,9 @@ export class BallManager {
     }
 
     addBall(startX?: number) {
-        const newBall = new Ball(startX || pad(WIDTH / 2 + 13), pad(50), this.ballRadiusPx, 'red', this.ctx, this.obstacles, this.sinks, (index) => {
+        // Start above the canvas so it doesn't begin inside colliders
+        const startYAboveCanvas = pad(-this.ballRadiusPx * 3);
+        const newBall = new Ball(startX || pad(WIDTH / 2 + 13), startYAboveCanvas, this.ballRadiusPx, 'red', this.ctx, this.obstacles, this.sinks, (index) => {
             this.balls = this.balls.filter(ball => ball !== newBall);
             this.onFinish?.(index, startX)
         });
@@ -123,6 +136,16 @@ export class BallManager {
             if (s.press && s.press > 0) {
                 s.press = Math.max(0, s.press - 0.06);
             }
+        }
+    }
+
+    private applySinksMultipliers() {
+        const desired = getMultipliersFor(this.rows, this.risk);
+        if (!desired || desired.length !== this.getNumSinks()) {
+            return;
+        }
+        for (let i = 0; i < this.sinks.length; i++) {
+            this.sinks[i].multiplier = desired[i];
         }
     }
 
