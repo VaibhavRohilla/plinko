@@ -1,8 +1,5 @@
 import { useEffect, useRef, useState, memo } from "react";
 import { BallManager } from "../game/classes/BallManager";
-import { outcomesByRows } from "../game/outcomesByRows";
-import { WIDTH } from "../game/constants";
-import { pad } from "../game/padding";
 
 // Type definitions
 type GameMode = "manual" | "auto";
@@ -325,20 +322,35 @@ export function Game() {
 
   useEffect(() => {
     if (canvasRef.current) {
-      const ballManager = new BallManager(canvasRef.current, undefined, { rows, risk });
+      const ballManager = new BallManager(
+        canvasRef.current,
+        (index: number, startX?: number) => {
+          const sx = typeof startX === 'number' ? startX : undefined;
+          const offset = typeof startX === 'number' ? ballManager.getOffsetForStartX(startX, /*isPadded*/ true) : undefined;
+          console.log('bin:', index, 'startX(padded):', sx, 'offset:', offset);
+        },
+        { rows, risk }
+      );
       setBallManager(ballManager);
     }
   }, [canvasRef]);
 
   useEffect(() => {
-    ballManager?.setConfig({ rows, risk });
+    ballManager?.setConfig({ rows, risk, calibrationRows: rows });
   }, [rows, risk, ballManager]);
 
   const placeBet = () => {
-    const slotOffset = outcomesByRows[16][1][0]; // choose any entry
-    const sinkW = ballManager?.getSinkWidth() ?? 36;
-    const startX = pad(WIDTH / 2 + sinkW * slotOffset);
-    ballManager?.addBall(startX);
+    if (!ballManager) return;
+    // Example simulation-provided value. This could be:
+    // - an offset (small float, ~[-8..+8]),
+    // - an unpadded pixel X (~[0..800]),
+    // - a padded startX (~[0..8_000_000]).
+    const simValue = 1.3880008401908432
+    ;
+
+    // Use a single interpreter to resolve to padded startX targeting bin 0
+    const startXToUse = ballManager.interpretInputValueToStartX(simValue, 0);
+    ballManager.addBall(startXToUse);
   };
 
   return (

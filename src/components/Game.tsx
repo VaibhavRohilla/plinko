@@ -9,7 +9,9 @@ export function Game() {
   useEffect(() => {
     if (canvasRef.current) {
       const ballManager = new BallManager(
-        canvasRef.current as unknown as HTMLCanvasElement
+        canvasRef.current as unknown as HTMLCanvasElement,()=>{
+          console.log("ball finished");
+        }
       );
       setBallManager(ballManager);
     }

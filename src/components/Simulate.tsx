@@ -32,7 +32,8 @@ export const Simulate = () => {
     let i = 0;
     while (1) {
       i++;
-      ballManager.addBall(pad(WIDTH / 2 + 20 * (Math.random() - 0.5)));
+      // Start exactly at the canvas center
+      ballManager.addBall(pad(WIDTH / 2));
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
@@ -41,11 +42,14 @@ export const Simulate = () => {
     if (canvasRef.current) {
       const ballManager = new BallManager(
         canvasRef.current as unknown as HTMLCanvasElement,
-        (index: number, startX?: number) => {
+        (index: number, _startX?: number) => {
+          // Only register confirmed bin hits (onFinish callback)
+          if (typeof index !== 'number' || index < 0) return;
           setOutputs((outputs: any) => {
             return {
               ...outputs,
-              [index]: [...(outputs[index] as number[]), startX],
+              // push a simple hit marker (1); length = total hits for this bin
+              [index]: [...(outputs[index] as number[]), 1],
             };
           });
         }

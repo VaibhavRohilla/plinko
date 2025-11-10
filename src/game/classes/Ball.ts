@@ -1,7 +1,7 @@
 import { gravity, horizontalFriction, verticalFriction } from "../constants";
 import type { Obstacle, Sink } from "../objects";
 // import type { Obstacle, Sink } from "../objects";
-import { pad, unpad } from "../padding";
+import { pad, unpad, DECIMAL_MULTIPLIER } from "../padding";
 
 export class Ball {
     private x: number;
@@ -43,8 +43,8 @@ export class Ball {
   
       // Collision with obstacles
       this.obstacles.forEach(obstacle => {
-        const dist = Math.hypot(this.x - obstacle.x, this.y - obstacle.y);
-        if (dist < pad(this.radius + obstacle.radius)) {
+        const distPadded = Math.hypot(this.x - obstacle.x, this.y - obstacle.y);
+        if (distPadded < pad(this.radius + obstacle.radius)) {
           // Calculate collision angle
           const angle = Math.atan2(this.y - obstacle.y, this.x - obstacle.x);
           // Reflect velocity
@@ -53,9 +53,12 @@ export class Ball {
           this.vy = Math.sin(angle) * speed * verticalFriction;
   
           // Adjust position to prevent sticking
-          const overlap = this.radius + obstacle.radius - unpad(dist);
-          this.x += pad(Math.cos(angle) * overlap);
-          this.y += pad(Math.sin(angle) * overlap);
+          const distPx = distPadded / DECIMAL_MULTIPLIER;
+          const overlapPx = this.radius + obstacle.radius - distPx;
+          if (overlapPx > 0) {
+            this.x += pad(Math.cos(angle) * overlapPx);
+            this.y += pad(Math.sin(angle) * overlapPx);
+          }
           // trigger glow on collider
           obstacle.glow = 1;
         }
@@ -64,11 +67,14 @@ export class Ball {
       // Collision with sinks
       for (let i = 0; i < this.sinks.length; i++) {
         const sink = this.sinks[i];
-        if (
-            unpad(this.x) > sink.x - sink.width / 2 &&
-            unpad(this.x) < sink.x + sink.width / 2 &&
-            (unpad(this.y) + this.radius) > (sink.y - sink.height / 2)
-        ) {
+        // Align collision with visual bin geometry used in drawSinks()
+        const cx = unpad(this.x);
+        const spacingVisual = sink.width * 0.15; // matches SPACING = sinkWidthPx * 0.15
+        const left = sink.x - sink.width * 0.15;
+        const w = Math.max(12, sink.width * 1.5 - spacingVisual);
+        const right = left + w;
+        const top = sink.y - sink.height / 2; // yBase before press
+        if (cx > left && cx < right && (unpad(this.y) + this.radius) > top) {
             this.vx = 0;
             this.vy = 0;
             // trigger bin feedback

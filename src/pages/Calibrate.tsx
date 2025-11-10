@@ -13,6 +13,7 @@ export function Calibrate() {
   const [outputs, setOutputs] = useState<Outputs>({});
   const [running, setRunning] = useState<boolean>(false);
   const [sinksCount, setSinksCount] = useState<number>(0);
+  const bmRef = useRef<BallManager | null>(null);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -29,6 +30,7 @@ export function Calibrate() {
       { rows }
     );
     setSinksCount(bm.getNumSinks());
+    bmRef.current = bm;
     return () => bm.stop();
   }, [canvasRef, rows]);
 
@@ -44,11 +46,12 @@ export function Calibrate() {
         return next;
       });
     }, { rows });
+    bmRef.current = bm;
 
-    // Drop balls uniformly over [-slotsHalfRange, +slotsHalfRange] slot offsets
+    // Drop balls uniformly over [-slotsHalfRange, +slotsHalfRange] using TRUE spacing mapping
     for (let i = 0; i < drops; i++) {
       const r = (Math.random() * 2 - 1) * slotsHalfRange;
-      const startX = pad(WIDTH / 2 + r * (WIDTH / Math.max(1, sinksCount))); // rough; will be normalized later
+      const startX = bm.getStartXPaddedForOffset(r);
       bm.addBall(startX);
       // let each ball land
       // eslint-disable-next-line no-await-in-loop
@@ -59,12 +62,12 @@ export function Calibrate() {
 
   // Build normalized JSON to paste into outcomesByRows
   const normalized: { [k: number]: number[] } = {};
-  const slotWidthApprox = WIDTH / Math.max(1, sinksCount); // visualization-only; final use will re-multiply by actual slotWidth
+  const spacing = bmRef.current?.getBottomRowCenterSpacingPx() ?? (WIDTH / Math.max(1, sinksCount));
   for (const k of Object.keys(outputs)) {
     const idx = Number(k);
     const arr = outputs[idx] || [];
     if (arr.length === 0) continue;
-    const offsets = arr.map((paddedPx) => (paddedPx / 10000 - WIDTH / 2) / slotWidthApprox);
+    const offsets = arr.map((paddedPx) => (paddedPx / 10000 - WIDTH / 2) / spacing);
     normalized[idx] = offsets;
   }
 
@@ -101,9 +104,9 @@ export function Calibrate() {
             type="number"
             className="bg-gray-800 border border-gray-700 rounded px-3 py-1 text-white"
             value={drops}
-            min={50}
+            min={1}
             max={2000}
-            onChange={(e) => setDrops(Math.min(2000, Math.max(50, parseInt(e.target.value || "500", 10))))}
+            onChange={(e) => setDrops(Math.min(2000, Math.max(1, parseInt(e.target.value || "500", 10))))}
           />
         </div>
 
