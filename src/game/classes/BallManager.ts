@@ -26,6 +26,7 @@ export class BallManager {
     private requestId?: number;
     private onFinish?: (index: number,startX?: number) => void;
     private lastTimestamp?: number;
+    private hitToasts: { text: string; background: string; color: string; y: number; age: number; life: number }[];
 
     private rows: number;
     private obstacleRadiusPx: number;
@@ -45,6 +46,7 @@ export class BallManager {
         this.canvasRef = canvasRef;
         this.ctx = this.canvasRef.getContext("2d")!;
         this.rows = config?.rows ?? 16;
+        this.hitToasts = [];
         // Dynamic geometry increases ball/collider when rows are low
         this.obstacleRadiusPx = this.computeObstacleRadius(this.rows);
         this.ballRadiusPx = this.computeBallRadius(this.rows);
@@ -324,6 +326,20 @@ export class BallManager {
             this.balls = this.balls.filter(ball => ball !== newBall);
             // Report the actual startX used (padded), not the optional input param
             this.onFinish?.(index, sx)
+            // spawn toast for multiplier near corresponding sink row on the right
+            const s = this.sinks[index];
+            if (s) {
+                const colorInfo = this.getColor(index);
+                const label = this.formatMultiplierLabel(s.multiplier ?? 1);
+                this.hitToasts.push({
+                    text: `${label}x`,
+                    background: colorInfo.background,
+                    color: colorInfo.color,
+                    y: s.y,
+                    age: 0,
+                    life: 180, // frames (~3s @60fps)
+                });
+            }
         });
         this.balls.push(newBall);
     }
@@ -558,6 +574,102 @@ export class BallManager {
         };
     }
 
+    private formatMultiplierLabel(mult: number): string {
+        if (Math.abs(mult - Math.round(mult)) < 1e-6) {
+            return String(Math.round(mult));
+        } else if (mult >= 1) {
+            return (Math.round(mult * 10) / 10).toString();
+        } else {
+            const v = Math.round(mult * 100) / 100; // up to 2 decimals
+            return v.toString().replace(/\.0+$/, '').replace(/(\.[1-9])0$/, '$1');
+        }
+    }
+
+    private drawHitToasts(dtScale: number) {
+        if (!this.hitToasts.length) return;
+        // age and prune
+        const next: typeof this.hitToasts = [];
+        for (const t of this.hitToasts) {
+            t.age += dtScale;
+            if (t.age < t.life) next.push(t);
+        }
+        // keep most recent N
+        const maxOnScreen = 6;
+        this.hitToasts = next.slice(-maxOnScreen);
+
+        // Pre-measure boxes to stack vertically with gaps
+        const paddingX = 12;
+        const paddingY = 6;
+        const fontPx = 16;
+        this.ctx.font = `bold ${fontPx}px Arial`;
+        const boxes = this.hitToasts.map((t) => {
+            const textW = Math.ceil(this.ctx.measureText(t.text).width);
+            const boxW = Math.max(40, textW + paddingX * 2);
+            const boxH = Math.max(22, fontPx + paddingY * 2);
+            return { boxW, boxH };
+        });
+        const gap = 10;
+        const totalH = boxes.reduce((s, b) => s + b.boxH, 0) + Math.max(0, (boxes.length - 1) * gap);
+        // push more to the right edge
+        const margin = 6;
+        const targetRight = WIDTH - margin;
+
+        // Center stack vertically alongside the board
+        let currentY = Math.max(20, (HEIGHT - totalH) / 2);
+
+        for (let i = 0; i < this.hitToasts.length; i++) {
+            const t = this.hitToasts[i];
+            const { boxW, boxH } = boxes[i];
+
+            const progress = Math.max(0, Math.min(1, t.age / t.life));
+            const appear = Math.min(1, t.age / 15);
+            const fade = progress > 0.8 ? (1 - (progress - 0.8) / 0.2) : 1;
+            const alpha = Math.max(0, Math.min(1, fade));
+
+            const targetLeft = targetRight - boxW;
+            const x = targetLeft + (1 - appear) * (boxW + 30); // deeper slide-in from right
+            // drop-in from above a bit to feel like it "falls down"
+            const fallDist = 24;
+            const y = currentY - (1 - appear) * fallDist;
+            currentY += boxH + gap;
+
+            this.ctx.save();
+            this.ctx.globalAlpha = alpha;
+            // 3D roll: for first 25 frames, tilt card and show pseudo depth, then flatten
+            const roll = Math.max(0, 1 - Math.min(1, t.age / 25));
+            const tilt = 0.35 * roll; // shear factor
+            const scaleY = 0.85 + 0.15 * (1 - roll);
+            const cx = x + boxW / 2;
+            const cy = y + boxH / 2;
+            this.ctx.translate(cx, cy);
+            this.ctx.transform(1, 0, tilt, scaleY, 0, 0);
+            this.ctx.translate(-cx, -cy);
+
+            // body
+            this.ctx.fillStyle = t.background;
+            this.drawRoundedRect(x, y, boxW, boxH, Math.min(12, boxH / 2));
+            this.ctx.fill();
+            // subtle top highlight to simulate 3D
+            const grad = this.ctx.createLinearGradient(x, y, x, y + boxH);
+            grad.addColorStop(0, 'rgba(255,255,255,0.12)');
+            grad.addColorStop(0.5, 'rgba(255,255,255,0.04)');
+            grad.addColorStop(1, 'rgba(0,0,0,0.08)');
+            this.ctx.fillStyle = grad;
+            this.drawRoundedRect(x, y, boxW, boxH, Math.min(12, boxH / 2));
+            this.ctx.fill();
+            // border
+            this.ctx.lineWidth = 2;
+            this.ctx.strokeStyle = '#0a0a0a';
+            this.ctx.stroke();
+            // text
+            this.ctx.textAlign = 'left';
+            this.ctx.textBaseline = 'middle';
+            this.ctx.fillStyle = t.color;
+            this.ctx.fillText(t.text, x + paddingX, y + boxH / 2);
+            this.ctx.restore();
+        }
+    }
+
     draw(dtScale: number) {
         this.ctx.clearRect(0, 0, WIDTH, HEIGHT);
         this.decayGlow(dtScale);
@@ -568,6 +680,7 @@ export class BallManager {
             ball.update();
         });
         this.drawSinks();
+        this.drawHitToasts(dtScale);
     }
     
     update(timestamp?: number) {
